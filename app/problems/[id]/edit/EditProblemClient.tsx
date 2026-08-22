@@ -3,7 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Save, ChevronLeft, ShieldAlert, Cpu, Clock, Edit, Plus, Trash2 } from "lucide-react";
+import {
+  Save,
+  ChevronLeft,
+  ShieldAlert,
+  Cpu,
+  Clock,
+  Edit,
+  Plus,
+  Trash2,
+  Code,
+  Sigma,
+  Table,
+  Bold,
+  Italic,
+  Eye,
+  FileText,
+} from "lucide-react";
 import { updateProblemAction } from "@/lib/actions/problems";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -21,7 +37,6 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
   const [title, setTitle] = useState(problem.title);
   const [category, setCategory] = useState(problem.category || "General");
 
-
   const [timeLimitMs, setTimeLimitMs] = useState(problem.time_limit_ms);
   const [memoryLimitMb, setMemoryLimitMb] = useState(problem.memory_limit_mb);
   const [content, setContent] = useState(problem.content);
@@ -32,10 +47,15 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
   const [isSubtask, setIsSubtask] = useState(problem.is_subtask);
   const [subtasks, setSubtasks] = useState<SubtaskConfig[]>(problem.subtasks || []);
 
+  const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   const PROBLEM_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+  const insertSnippet = (snippet: string) => {
+    setContent((prev) => prev + (prev.endsWith("\n") || !prev ? "" : "\n") + snippet);
+  };
 
   const handleSampleChange = (key: "input" | "output", value: string) => {
     if (key === "input") setSampleInput(value);
@@ -66,7 +86,6 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
   const handleSave = async () => {
     setError(null);
 
-    // Frontend validations
     const normalizedId = id.trim().toLowerCase();
     if (!normalizedId) {
       setError("Mã bài tập (ID) không được để trống.");
@@ -122,29 +141,51 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col selection:bg-cypher-cyan/30">
       {/* Header */}
       <header className="border-b border-cypher-border bg-cypher-surface/85 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href={`/problems/${problem.id}`} className="flex items-center gap-1.5 text-sm font-medium text-cypher-muted hover:text-cypher-cyan transition-colors">
+            <Link
+              href={`/problems/${problem.id}`}
+              className="flex items-center gap-1.5 text-sm font-semibold text-cypher-muted hover:text-cypher-cyan transition-colors"
+            >
               <ChevronLeft className="w-4 h-4" /> Quay lại đề bài
             </Link>
             <span className="text-cypher-border/60">|</span>
-            <span className="text-sm text-cypher-muted">
-              Chỉnh sửa <span className="text-cypher-cyan font-medium">#{problem.id}</span>
+            <span className="text-sm font-bold text-cypher-muted">
+              Chỉnh sửa <span className="text-cypher-cyan font-mono font-bold">#{problem.id}</span>
             </span>
           </div>
 
-          <span className="text-lg font-semibold tracking-tight text-shimmer hidden md:inline">
-            Cypher<span className="text-cypher-cyan">.Editor</span>
+          <span className="text-lg font-black tracking-widest text-shimmer hidden md:inline">
+            CYPHER<span className="text-cypher-cyan">.EDITOR</span>
           </span>
 
           <div className="flex items-center gap-3">
+            <div className="flex lg:hidden items-center p-1 bg-cypher-surface border border-cypher-border rounded-xl">
+              <button
+                onClick={() => setActiveTab("edit")}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "edit" ? "bg-cypher-cyan text-zinc-950" : "text-cypher-muted"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setActiveTab("preview")}
+                className={`p-1.5 rounded-lg text-xs font-bold transition-all ${
+                  activeTab === "preview" ? "bg-cypher-cyan text-zinc-950" : "text-cypher-muted"
+                }`}
+              >
+                <Eye className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="soft-btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              className="soft-btn-primary disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(14,165,233,0.3)]"
             >
               <Save className="w-4 h-4" />
               {isSaving ? "Đang lưu..." : "Lưu thay đổi"}
@@ -156,31 +197,31 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
 
       {/* Editor Body Split Layout */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Left Side: Form Editor (Scrollable) */}
-        <div className="w-full lg:w-[50%] overflow-y-auto p-4 sm:p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-cypher-border flex flex-col gap-6">
-          <div className="cyber-panel p-5 rounded-2xl flex items-center gap-3 bg-amber-500/5 border-amber-500/20 text-amber-500">
-            <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-            <span className="text-xs font-bold tracking-tight leading-normal uppercase">
+        {/* Left Side: Form Editor */}
+        <div
+          className={`w-full lg:w-[50%] overflow-y-auto p-4 sm:p-6 lg:p-8 border-b lg:border-b-0 lg:border-r border-cypher-border flex flex-col gap-6 ${
+            activeTab === "preview" ? "hidden lg:flex" : "flex"
+          }`}
+        >
+          <div className="cyber-panel p-4 rounded-xl flex items-center gap-3 bg-amber-500/10 border-amber-500/30 text-amber-500">
+            <ShieldAlert className="w-5 h-5 shrink-0" />
+            <span className="text-xs font-bold tracking-tight uppercase leading-normal">
               Chú ý: Thay đổi mã bài tập (ID) sẽ tự động đồng bộ hóa trên hệ thống database MongoDB.
             </span>
           </div>
 
           {error && (
-            <div className="cyber-panel p-5 rounded-2xl flex items-center gap-3 bg-red-500/5 border-red-500/20 text-red-500">
-              <ShieldAlert className="w-5 h-5 flex-shrink-0" />
-              <span className="text-xs font-bold tracking-tight leading-normal">
-                LỖI: {error}
-              </span>
+            <div className="cyber-panel p-4 rounded-xl flex items-center gap-3 bg-red-500/10 border-red-500/30 text-red-500">
+              <ShieldAlert className="w-5 h-5 shrink-0" />
+              <span className="text-xs font-bold font-mono">LỖI: {error}</span>
             </div>
           )}
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             {/* General Info */}
             <div className="flex flex-col gap-4">
-              <h3 className="soft-section-title">
-                Thông tin chung
-              </h3>
-              
+              <h3 className="soft-section-title">Thông tin chung</h3>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="soft-label">Mã bài tập (ID)</label>
@@ -188,8 +229,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                     type="text"
                     value={id}
                     onChange={(e) => setId(e.target.value)}
-                    placeholder="ví-du-viet-lien-khong-dau"
-                    className="soft-input font-mono text-sm text-cypher-cyan"
+                    className="soft-input font-mono text-sm text-cypher-cyan font-bold"
                   />
                 </div>
 
@@ -199,7 +239,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="soft-input"
+                    className="soft-input font-bold"
                   />
                 </div>
               </div>
@@ -211,14 +251,14 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                     type="text"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    placeholder="Ví dụ: Quy hoạch động, Toán học..."
+                    placeholder="Ví dụ: Quy hoạch động, Toán..."
                     className="soft-input"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="soft-label flex items-center gap-1.5">
+                    <label className="soft-label flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5 text-cypher-cyan" /> Thời gian (ms)
                     </label>
                     <input
@@ -226,12 +266,12 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                       value={timeLimitMs}
                       onChange={(e) => setTimeLimitMs(Number(e.target.value))}
                       min={1}
-                      className="soft-input font-mono"
+                      className="soft-input font-mono font-bold"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="soft-label flex items-center gap-1.5">
+                    <label className="soft-label flex items-center gap-1">
                       <Cpu className="w-3.5 h-3.5 text-cypher-cyan" /> Bộ nhớ (MB)
                     </label>
                     <input
@@ -239,45 +279,99 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                       value={memoryLimitMb}
                       onChange={(e) => setMemoryLimitMb(Number(e.target.value))}
                       min={1}
-                      className="soft-input font-mono"
+                      className="soft-input font-mono font-bold"
                     />
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Markdown + LaTeX Fields */}
-            <div className="flex flex-col gap-4">
-              <h3 className="soft-section-title flex items-center justify-between">
-                <span>Nội dung bài tập</span>
-                <span className="text-[11px] text-cypher-muted font-normal">Hỗ trợ Markdown & LaTeX</span>
-              </h3>
+            {/* Markdown + LaTeX Fields with Quick Toolbar */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between border-b border-cypher-border/40 pb-2">
+                <h3 className="soft-section-title border-0 p-0">Nội dung bài tập (Markdown & LaTeX)</h3>
+              </div>
+
+              {/* Quick Snippet Insert Toolbar */}
+              <div className="flex flex-wrap items-center gap-1.5 p-2 bg-cypher-surface rounded-xl border border-cypher-border text-xs">
+                <span className="text-[10px] font-bold text-cypher-muted font-mono uppercase mr-1">Chèn nhanh:</span>
+                <button
+                  type="button"
+                  onClick={() => insertSnippet(" $x$ ")}
+                  className="px-2 py-1 rounded bg-cypher-cyan/10 text-cypher-cyan border border-cypher-cyan/20 font-mono font-bold hover:bg-cypher-cyan/20"
+                  title="Công thức Inline LaTeX ($x$)"
+                >
+                  <Sigma className="w-3 h-3 inline mr-1" /> $x$
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("\n$$\nE = mc^2\n$$\n")}
+                  className="px-2 py-1 rounded bg-cypher-purple/10 text-cypher-purple border border-cypher-purple/20 font-mono font-bold hover:bg-cypher-purple/20"
+                  title="Công thức Block LaTeX ($$E=mc^2$$)"
+                >
+                  $$ Block $$
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("\n```cpp\n#include <iostream>\nusing namespace std;\n\nint main() {\n    return 0;\n}\n```\n")}
+                  className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono font-bold hover:bg-emerald-500/20"
+                  title="Khối Code C++"
+                >
+                  <Code className="w-3 h-3 inline mr-1" /> ```cpp
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => insertSnippet("\n| Cột 1 | Cột 2 |\n| --- | --- |\n| Giá trị 1 | Giá trị 2 |\n")}
+                  className="px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono font-bold hover:bg-amber-500/20"
+                  title="Bảng Markdown"
+                >
+                  <Table className="w-3 h-3 inline mr-1" /> Bảng
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => insertSnippet(" **in đậm** ")}
+                  className="px-2 py-1 rounded bg-cypher-surface border border-cypher-border font-bold hover:text-cypher-cyan"
+                  title="In đậm"
+                >
+                  <Bold className="w-3 h-3" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => insertSnippet(" *in nghiêng* ")}
+                  className="px-2 py-1 rounded bg-cypher-surface border border-cypher-border italic hover:text-cypher-cyan"
+                  title="In nghiêng"
+                >
+                  <Italic className="w-3 h-3" />
+                </button>
+              </div>
 
               <div className="flex flex-col gap-1.5">
                 <label className="soft-label">Đề bài (Statement)</label>
                 <textarea
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  rows={10}
-                  className="soft-input soft-textarea"
+                  rows={9}
+                  className="soft-input soft-textarea font-mono"
                 />
               </div>
             </div>
 
             {/* Input/Output Format */}
             <div className="flex flex-col gap-4">
-              <h3 className="soft-section-title">
-                Định dạng dữ liệu (I/O Format)
-              </h3>
+              <h3 className="soft-section-title">Định dạng dữ liệu (I/O Format)</h3>
 
               <div className="flex flex-col gap-1.5">
                 <label className="soft-label">Input Format — Định dạng đầu vào</label>
                 <textarea
                   value={inputFormat}
                   onChange={(e) => setInputFormat(e.target.value)}
-                  rows={5}
-                  placeholder="Mô tả định dạng dữ liệu đầu vào..."
-                  className="soft-input soft-textarea"
+                  rows={4}
+                  className="soft-input soft-textarea font-mono"
                 />
               </div>
 
@@ -286,19 +380,16 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                 <textarea
                   value={outputFormat}
                   onChange={(e) => setOutputFormat(e.target.value)}
-                  rows={5}
-                  placeholder="Mô tả định dạng kết quả đầu ra..."
-                  className="soft-input soft-textarea"
+                  rows={4}
+                  className="soft-input soft-textarea font-mono"
                 />
               </div>
             </div>
 
             {/* Sample Input/Output */}
             <div className="flex flex-col gap-4">
-              <h3 className="soft-section-title">
-                Ví dụ minh họa (Sample Case)
-              </h3>
-              
+              <h3 className="soft-section-title">Ví dụ minh họa (Sample Cases)</h3>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="soft-label">Sample Input</label>
@@ -306,7 +397,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                     value={sampleInput}
                     onChange={(e) => handleSampleChange("input", e.target.value)}
                     rows={4}
-                    className="soft-input soft-textarea text-xs"
+                    className="soft-input soft-textarea font-mono text-xs"
                   />
                 </div>
 
@@ -316,7 +407,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                     value={sampleOutput}
                     onChange={(e) => handleSampleChange("output", e.target.value)}
                     rows={4}
-                    className="soft-input soft-textarea text-xs"
+                    className="soft-input soft-textarea font-mono text-xs"
                   />
                 </div>
               </div>
@@ -324,21 +415,21 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
 
             {/* Subtask configuration */}
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between border-b border-cypher-border/40 pb-1.5">
+              <div className="flex items-center justify-between border-b border-cypher-border/40 pb-2">
                 <h3 className="text-xs font-black uppercase tracking-widest text-cypher-cyan">
-                  Cấu hình điểm số bài tập
+                  Cấu hình thang điểm
                 </h3>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-cypher-muted font-bold font-mono">Chia Subtasks:</span>
                   <button
                     type="button"
                     onClick={() => setIsSubtask(!isSubtask)}
-                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
                       isSubtask ? "bg-cypher-cyan" : "bg-zinc-800"
                     }`}
                   >
                     <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow ring-0 transition duration-200 ease-in-out ${
+                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-background shadow transition duration-200 ease-in-out ${
                         isSubtask ? "translate-x-4" : "translate-x-0"
                       }`}
                     />
@@ -348,12 +439,15 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
 
               {isSubtask ? (
                 <div className="flex flex-col gap-4">
-                  <div className="flex justify-between items-center bg-cypher-surface/20 p-3.5 rounded-xl border border-cypher-border">
+                  <div className="flex justify-between items-center bg-cypher-surface p-3.5 rounded-xl border border-cypher-border">
                     <span className="text-xs text-cypher-muted">
-                      Tổng số subtask: <strong className="text-foreground">{subtasks.length}</strong>
+                      Số Subtasks: <strong className="text-foreground font-mono">{subtasks.length}</strong>
                     </span>
                     <span className="text-xs text-cypher-muted">
-                      Tổng điểm: <strong className="text-cypher-cyan">{totalPoints}</strong>
+                      Tổng điểm:{" "}
+                      <strong className={`font-mono font-bold ${totalPoints === 100 ? "text-green-500" : "text-cypher-cyan"}`}>
+                        {totalPoints}đ
+                      </strong>
                     </span>
                     <button
                       type="button"
@@ -390,7 +484,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                         <button
                           type="button"
                           onClick={() => removeSubtask(index)}
-                          className="p-2 border border-red-500/20 hover:border-red-500 hover:text-red-500 rounded-lg text-red-500/60 transition-colors self-end sm:self-center"
+                          className="p-2 border border-red-500/20 hover:border-red-500 hover:text-red-500 rounded-lg text-red-500/60 transition-colors self-center"
                           title="Xóa Subtask"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -400,50 +494,58 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                   </div>
                 </div>
               ) : (
-                <div className="bg-cypher-surface/20 p-4.5 rounded-xl border border-cypher-border text-center text-xs text-cypher-muted font-semibold">
-                  Chế độ Subtask tắt. Bài tập sẽ được chấm toàn bộ với thang điểm mặc định <span className="text-cypher-cyan font-bold">100đ</span>.
+                <div className="bg-cypher-surface p-4 rounded-xl border border-cypher-border text-center text-xs text-cypher-muted font-medium">
+                  Chế độ Subtask tắt. Đề bài chấm theo thang điểm mặc định <span className="text-cypher-cyan font-bold">100đ</span>.
                 </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* Right Side: Live Markdown & LaTeX Preview (Scrollable) */}
-        <div className="flex-grow lg:w-[50%] overflow-y-auto p-4 sm:p-6 lg:p-8 bg-cypher-surface/20 flex flex-col gap-6">
-          <div className="border-b border-cypher-border/60 pb-3">
-            <h3 className="text-sm font-semibold text-cypher-cyan flex items-center gap-2">
-              <Edit className="w-4 h-4" />
-              Xem trước đề bài
-            </h3>
-            <p className="text-xs text-cypher-muted mt-1">
-              Hiển thị trực tiếp nội dung markdown và công thức LaTeX.
-            </p>
+        {/* Right Side: Live Markdown & LaTeX Preview */}
+        <div
+          className={`flex-grow lg:w-[50%] overflow-y-auto p-4 sm:p-6 lg:p-8 bg-cypher-surface/20 flex flex-col gap-6 ${
+            activeTab === "edit" ? "hidden lg:flex" : "flex"
+          }`}
+        >
+          <div className="border-b border-cypher-border/60 pb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-cypher-cyan flex items-center gap-2">
+                <Edit className="w-4 h-4" /> Xem trước trực tiếp (Live Preview)
+              </h3>
+              <p className="text-xs text-cypher-muted mt-0.5">
+                Hiển thị kết quả Markdown & LaTeX được render ngay lập tức.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-8 max-w-4xl">
-            <div className="cyber-panel p-5 rounded-2xl border-l-[3px] border-l-cypher-cyan">
-              <span className="soft-badge">{category || "Bài tập"}</span>
-              <h2 className="text-2xl soft-heading mt-2 text-foreground">{title || "Chưa đặt tên"}</h2>
-              <div className="flex flex-wrap gap-4 mt-3 text-xs text-cypher-muted">
-                <span>Thời gian: <strong className="text-foreground font-medium">{timeLimitMs} ms</strong></span>
-                <span>Bộ nhớ: <strong className="text-foreground font-medium">{memoryLimitMb} MB</strong></span>
-                <span>Điểm: <strong className="text-cypher-cyan font-medium">{totalPoints}đ</strong></span>
+            {/* Title Render */}
+            <div className="cyber-panel p-6 rounded-2xl border-l-4 border-l-cypher-cyan shadow-sm">
+              <span className="cyber-badge-cyan">{category || "Bài tập"}</span>
+              <h2 className="text-2xl font-black mt-2 text-foreground">{title || "Tên bài tập..."}</h2>
+              <div className="flex flex-wrap gap-4 mt-3 text-xs text-cypher-muted font-mono">
+                <span>Thời gian: <strong className="text-foreground">{timeLimitMs} ms</strong></span>
+                <span>Bộ nhớ: <strong className="text-foreground">{memoryLimitMb} MB</strong></span>
+                <span>Điểm: <strong className="text-cypher-cyan">{totalPoints}đ</strong></span>
               </div>
             </div>
 
+            {/* Statement Preview */}
             <div className="flex flex-col gap-2">
-              <span className="soft-label">Nội dung đề bài</span>
-              <div className="cyber-panel p-5 rounded-xl">
-                {content ? <MarkdownRenderer content={content} /> : <span className="text-sm italic text-cypher-muted">Đang trống...</span>}
+              <span className="soft-label">Đề bài</span>
+              <div className="cyber-panel p-6 rounded-2xl shadow-sm">
+                {content ? <MarkdownRenderer content={content} /> : <span className="text-sm italic text-cypher-muted">Chưa có nội dung đề bài...</span>}
               </div>
             </div>
 
+            {/* I/O Format Preview */}
             {(inputFormat || outputFormat) && (
               <div className="flex flex-col gap-4">
                 {inputFormat && (
                   <div className="flex flex-col gap-2">
                     <span className="soft-label">Input Format</span>
-                    <div className="cyber-panel p-4 rounded-xl">
+                    <div className="cyber-panel p-5 rounded-2xl shadow-sm">
                       <MarkdownRenderer content={inputFormat} />
                     </div>
                   </div>
@@ -451,7 +553,7 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
                 {outputFormat && (
                   <div className="flex flex-col gap-2">
                     <span className="soft-label">Output Format</span>
-                    <div className="cyber-panel p-4 rounded-xl">
+                    <div className="cyber-panel p-5 rounded-2xl shadow-sm">
                       <MarkdownRenderer content={outputFormat} />
                     </div>
                   </div>
@@ -459,16 +561,17 @@ export function EditProblemClient({ problem }: EditProblemClientProps) {
               </div>
             )}
 
+            {/* Sample Preview */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <span className="soft-label">Sample Input</span>
-                <pre className="bg-zinc-950/70 dark:bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-300 max-h-[200px] overflow-y-auto leading-relaxed">
+                <pre className="bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
                   {sampleInput || "[Trống]"}
                 </pre>
               </div>
               <div className="flex flex-col gap-2">
                 <span className="soft-label">Sample Output</span>
-                <pre className="bg-zinc-950/70 dark:bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-300 max-h-[200px] overflow-y-auto leading-relaxed">
+                <pre className="bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
                   {sampleOutput || "[Trống]"}
                 </pre>
               </div>
