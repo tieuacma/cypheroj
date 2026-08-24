@@ -12,7 +12,7 @@ interface CypherButtonBaseProps {
 
 interface CypherButtonProps
   extends CypherButtonBaseProps,
-    ButtonHTMLAttributes<HTMLButtonElement> {}
+    Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> {}
 
 interface CypherButtonLinkProps extends CypherButtonBaseProps {
   href: string;

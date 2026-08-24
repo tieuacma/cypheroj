@@ -58,6 +58,13 @@ export const TRANSLATIONS = {
       sampleAb: "A + B Problem",
       sampleTwoSum: "Two Sum (Hash Map)",
     },
+    footer: {
+      tagline: "Đấu trường lập trình C++ chiến thuật dành cho học sinh.",
+      learn: "Học tập",
+      agentIntel: "Agent Intel",
+      quote: "Mọi thuật toán đều để lại dấu vết.",
+      rights: "All systems operational.",
+    },
   },
   en: {
     nav: {
@@ -115,6 +122,13 @@ export const TRANSLATIONS = {
       reset: "Reset",
       sampleAb: "A + B Problem",
       sampleTwoSum: "Two Sum (Hash Map)",
+    },
+    footer: {
+      tagline: "A tactical C++ coding arena for student programmers.",
+      learn: "Learn",
+      agentIntel: "Agent Intel",
+      quote: "Every algorithm leaves a trace.",
+      rights: "All systems operational.",
     },
   },
 };
