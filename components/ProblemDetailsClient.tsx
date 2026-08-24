@@ -1,19 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
-
-
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Clock, Cpu, Tag, Users, CheckCircle, ChevronLeft, Play, Edit, User } from "lucide-react";
+import {
+  Code2,
+  Clock,
+  Cpu,
+  Tag,
+  Users,
+  CheckCircle,
+  Play,
+  Edit,
+  User,
+} from "lucide-react";
 import { getProblem, saveSubmission } from "@/lib/problems-store";
 import { CodeEditor } from "@/components/CodeEditor";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { CodeBlock } from "@/components/ui/CodeBlock";
 import { DEFAULT_CPP_TEMPLATE, type Submission } from "@/lib/types";
-
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { Navbar } from "@/components/Navbar";
+import { useAuth } from "@/lib/auth-context";
+import { recordStudentSubmission } from "@/lib/services/auth";
+import { CypherVoicelineWidget } from "@/components/CypherVoicelineWidget";
+import { CypherSubmitAnimationModal } from "@/components/CypherSubmitAnimationModal";
 
 interface ProblemDetailsClientProps {
   id: string;
@@ -21,42 +32,56 @@ interface ProblemDetailsClientProps {
 
 export function ProblemDetailsClient({ id }: ProblemDetailsClientProps) {
   const router = useRouter();
+  const { user } = useAuth();
+
   const problem = useMemo(() => {
     return getProblem(id) ?? null;
   }, [id]);
 
-
   const [code, setCode] = useState(DEFAULT_CPP_TEMPLATE);
-
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [username, setUsername] = useState(user?.username || "hocsinh1");
 
-  const [username, setUsername] = useState("Cypher");
+  // Cypher Submit Modal State
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"compiling" | "evaluating" | "completed" | "error">("compiling");
+  const [passedCount, setPassedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(20);
+  const [verdictText, setVerdictText] = useState("ACCEPTED");
+  const [verdictScore, setVerdictScore] = useState(100);
+  const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
 
-
+  useEffect(() => {
+    if (user?.username) {
+      setUsername(user.username);
+    }
+  }, [user]);
 
   if (!problem) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-cypher-muted font-mono">
-
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-cypher-cyan border-t-transparent rounded-full animate-spin" />
-          <span>ACCESSING SECURE NODE #{id}...</span>
+      <div className="min-h-screen bg-background flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center text-muted-foreground font-semibold">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin" />
+            <span>Đang tải thông tin bài tập #{id}...</span>
+          </div>
         </div>
       </div>
     );
   }
 
-  const handleSubmit = () => {
-    // Generate a unique submission ID
+  const handleSubmit = async () => {
     const submissionId = "sub_" + Date.now() + Math.random().toString(36).substring(2, 6);
-    
+    setPendingSubmissionId(submissionId);
+
     const newSubmission: Submission = {
       id: submissionId,
       problemId: problem.id,
       problemTitle: problem.title,
       code: code,
-      username: username.trim() || "Guest_Agent",
-      timestamp: new Date().toLocaleTimeString() + " " + new Date().toLocaleDateString(),
+      username: username.trim() || "HocSinh",
+      timestamp: new Date().toLocaleTimeString("vi-VN") + " " + new Date().toLocaleDateString("vi-VN"),
       status: "Pending",
       testcases: Array.from({ length: 20 }, (_, idx) => ({
         index: idx + 1,
@@ -64,113 +89,119 @@ export function ProblemDetailsClient({ id }: ProblemDetailsClientProps) {
       })),
     };
 
-    // Save to localStorage store
     saveSubmission(newSubmission);
-    
-    // Redirect to submission route
-    router.push(`/submission/${submissionId}`);
+
+    if (username.trim()) {
+      recordStudentSubmission(username.trim(), problem.id, true);
+    }
+
+    // Trigger Cypher Animation Modal Flow
+    setIsSubmitModalOpen(true);
+    setSubmitStatus("compiling");
+    setPassedCount(0);
+
+    setTimeout(() => {
+      setSubmitStatus("evaluating");
+      setPassedCount(5);
+    }, 600);
+
+    setTimeout(() => {
+      setPassedCount(14);
+    }, 1200);
+
+    setTimeout(() => {
+      setPassedCount(20);
+      setSubmitStatus("completed");
+    }, 1800);
+  };
+
+  const handleFinishSubmit = () => {
+    setIsSubmitModalOpen(false);
+    if (pendingSubmissionId) {
+      router.push(`/submission/${pendingSubmissionId}`);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Header */}
-      <header className="border-b border-cypher-border bg-cypher-surface/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/problems" className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-cypher-muted hover:text-cypher-cyan transition-colors">
-              <ChevronLeft className="w-4 h-4" />
-              Thoát
-            </Link>
-            <span className="text-cypher-border">|</span>
-            <span className="text-xs font-mono text-cypher-muted">
-              NODE_ID: <span className="text-cypher-cyan font-bold">#{problem.id}</span>
-            </span>
-          </div>
+    <div className="min-h-screen bg-background flex flex-col text-foreground selection:bg-sky-500/20">
+      <Navbar />
 
-          <span className="text-lg font-black tracking-widest text-shimmer hidden md:inline">
-            CYPHER<span className="text-cypher-cyan">.WORKSPACE</span>
-          </span>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/problem/${problem.id}/edit`}
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-cypher-border hover:border-cypher-cyan hover:text-cypher-cyan text-xs font-bold transition-all bg-cypher-surface"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              Chỉnh sửa đề
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      {/* Main split dashboard */}
+      {/* Main split workspace */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left/Main Column: Problem Statement */}
-        <div 
+        <div
           className={`flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 transition-all duration-300 ${
-            isEditorOpen ? "lg:max-w-[50%] border-r border-cypher-border" : "w-full"
+            isEditorOpen ? "lg:max-w-[50%] border-r border-border" : "w-full"
           }`}
         >
           <div className="max-w-4xl mx-auto flex flex-col gap-8">
             {/* Title HUD block */}
-            <div className="cyber-panel p-6 rounded-2xl border-l-4 border-l-cypher-cyan">
-              <span className="text-xs font-bold uppercase tracking-wider text-cypher-cyan">
-                {problem.group || "Bài tập"}
-              </span>
-              <h1 className="text-3xl font-black tracking-tight mt-1 uppercase text-foreground">
+            <div className="p-6 rounded-3xl border border-sky-500/20 bg-card shadow-sm border-l-4 border-l-sky-500">
+              <div className="flex items-center justify-between">
+                <span className="px-3 py-1 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400 font-extrabold text-xs border border-sky-500/20">
+                  {problem.group || "Bài tập"}
+                </span>
+                <Link
+                  href={`/problems/${problem.id}/edit`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-all"
+                >
+                  <Edit className="w-3.5 h-3.5" /> Sửa bài (Key Admin)
+                </Link>
+              </div>
+
+              <h1 className="text-2xl md:text-3xl font-black tracking-tight mt-3 text-foreground">
                 {problem.title}
               </h1>
-              
-              {/* Constraints shown directly under title - DMOJ/Codeforces hybrid style */}
-              <div className="flex flex-wrap gap-4 mt-4 text-xs font-mono text-cypher-muted">
-                <span className="flex items-center gap-1">
-                  <Clock className="w-4 h-4 text-cypher-cyan" />
+
+              {/* Constraints */}
+              <div className="flex flex-wrap gap-4 mt-4 text-xs font-mono text-muted-foreground">
+                <span className="flex items-center gap-1 font-bold">
+                  <Clock className="w-4 h-4 text-sky-500" />
                   Giới hạn thời gian: <strong className="text-foreground">{problem.timeLimit} ms</strong>
                 </span>
-                <span className="flex items-center gap-1">
-                  <Cpu className="w-4 h-4 text-cypher-cyan" />
+                <span className="flex items-center gap-1 font-bold">
+                  <Cpu className="w-4 h-4 text-sky-500" />
                   Giới hạn bộ nhớ: <strong className="text-foreground">{problem.memoryLimit} MB</strong>
                 </span>
               </div>
             </div>
 
-            {/* Statement content unified block */}
+            {/* Statement content */}
             <div className="flex flex-col gap-6">
-              <div className="cyber-panel p-6 rounded-2xl bg-cypher-surface/30 flex flex-col gap-8">
+              <div className="p-6 md:p-8 rounded-3xl border border-sky-500/15 bg-card flex flex-col gap-8 shadow-sm">
                 <section>
-                  <h2 className="text-sm font-black uppercase tracking-wider text-cypher-cyan border-b border-cypher-border/40 pb-2 mb-4">
+                  <h2 className="text-sm font-black uppercase tracking-wider text-sky-500 border-b border-border/60 pb-2 mb-4">
                     Đề bài / Statement
                   </h2>
                   <MarkdownRenderer content={problem.statement} />
                 </section>
 
                 <section>
-                  <h2 className="text-sm font-black uppercase tracking-wider text-cypher-cyan border-b border-cypher-border/40 pb-2 mb-4">
-                    Định dạng dữ liệu vào / Input format
+                  <h2 className="text-sm font-black uppercase tracking-wider text-sky-500 border-b border-border/60 pb-2 mb-4">
+                    Định dạng dữ liệu đầu vào / Input format
                   </h2>
                   <MarkdownRenderer content={problem.inputFormat} />
                 </section>
 
                 <section>
-                  <h2 className="text-sm font-black uppercase tracking-wider text-cypher-cyan border-b border-cypher-border/40 pb-2 mb-4">
+                  <h2 className="text-sm font-black uppercase tracking-wider text-sky-500 border-b border-border/60 pb-2 mb-4">
                     Định dạng kết quả đầu ra / Output format
                   </h2>
                   <MarkdownRenderer content={problem.outputFormat} />
                 </section>
               </div>
 
-              {/* Sample tests unified block */}
-              <section className="cyber-panel p-6 rounded-2xl bg-cypher-surface/30 flex flex-col gap-4">
-                <h2 className="text-sm font-black uppercase tracking-wider text-cypher-cyan border-b border-cypher-border/40 pb-2 mb-2">
-                  Ví dụ minh họa / Samples
+              {/* Sample tests */}
+              <section className="p-6 md:p-8 rounded-3xl border border-sky-500/15 bg-card flex flex-col gap-4 shadow-sm">
+                <h2 className="text-sm font-black uppercase tracking-wider text-sky-500 border-b border-border/60 pb-2 mb-2">
+                  Ví dụ minh họa / Sample Cases
                 </h2>
-                
+
                 <div className="flex flex-col gap-6">
                   {problem.samples.map((sample, index) => (
-                    <div key={index} className="flex flex-col gap-3 border-l-2 border-cypher-cyan/40 pl-4 py-1">
-                      <span className="text-xs font-bold text-cypher-cyan font-mono">
-                        SAMPLE_TEST_CASE #{index + 1}
+                    <div key={index} className="flex flex-col gap-3 border-l-2 border-sky-500/40 pl-4 py-1">
+                      <span className="text-xs font-bold text-sky-500 font-mono">
+                        SAMPLE_CASE #{index + 1}
                       </span>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <CodeBlock label="Dữ liệu vào (Input)" code={sample.input} />
@@ -184,7 +215,7 @@ export function ProblemDetailsClient({ id }: ProblemDetailsClientProps) {
           </div>
         </div>
 
-        {/* Dynamic Submission Panel (LeetCode/CF layout mix) */}
+        {/* Dynamic Editor Panel */}
         <AnimatePresence>
           {isEditorOpen ? (
             <motion.div
@@ -192,32 +223,34 @@ export function ProblemDetailsClient({ id }: ProblemDetailsClientProps) {
               animate={{ width: "50%", opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               transition={{ duration: 0.3 }}
-              className="hidden lg:flex flex-col bg-cypher-surface/30 overflow-hidden"
+              className="hidden lg:flex flex-col bg-muted/20 border-l border-border overflow-hidden"
             >
               <div className="flex-1 flex flex-col p-6 gap-4 overflow-y-auto">
-                <div className="flex justify-between items-center border-b border-cypher-border pb-3">
-                  <h3 className="text-sm font-black uppercase tracking-wider text-cypher-cyan flex items-center gap-2">
-                    <Terminal className="w-4 h-4" />
-                    C++ Compiler Console
+                <div className="flex justify-between items-center border-b border-border pb-3">
+                  <h3 className="text-sm font-black uppercase tracking-wider text-sky-500 flex items-center gap-2">
+                    <Code2 className="w-4 h-4" />
+                    Khung Soạn Thảo Code C++
                   </h3>
-                  <button 
+                  <button
                     onClick={() => setIsEditorOpen(false)}
-                    className="text-xs text-cypher-muted hover:text-foreground font-bold"
+                    className="text-xs text-muted-foreground hover:text-foreground font-bold"
                   >
                     Thu nhỏ ✕
                   </button>
                 </div>
 
-                {/* Submitter Name HUD Input */}
-                <div className="flex items-center gap-3 cyber-panel p-4 rounded-xl bg-background/50 border border-cypher-border focus-within:border-cypher-cyan focus-within:ring-2 focus-within:ring-cypher-cyan/20 transition-all">
-                  <User className="w-5 h-5 text-cypher-cyan" />
-                  <span className="text-xs font-bold text-cypher-muted font-mono uppercase">Agent Identifier:</span>
+                {/* Cypher Live Voiceline Banner */}
+                <CypherVoicelineWidget type="compiling" />
+
+                <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-card border border-border">
+                  <User className="w-4 h-4 text-sky-500" />
+                  <span className="text-xs font-bold text-muted-foreground uppercase">Học sinh nộp bài:</span>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Nhập tên của bạn..."
-                    className="bg-transparent text-sm focus:outline-none flex-grow text-foreground font-semibold placeholder:text-cypher-muted/50"
+                    placeholder="Tên học sinh..."
+                    className="bg-transparent text-sm font-bold outline-none flex-1 text-foreground"
                   />
                 </div>
 
@@ -231,134 +264,81 @@ export function ProblemDetailsClient({ id }: ProblemDetailsClientProps) {
 
                 <button
                   onClick={handleSubmit}
-                  className="btn-glow w-full flex items-center justify-center gap-2 bg-cypher-cyan text-zinc-950 font-black tracking-wider py-4 rounded-xl hover:bg-cypher-cyan/95 transition-all hover:shadow-[0_0_30px_rgba(14,165,233,0.4)] hover:scale-[1.02] active:scale-[0.98] uppercase text-sm mt-2 border-2 border-transparent hover:border-cypher-cyan/30"
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 via-cyan-500 to-indigo-600 text-white font-extrabold tracking-wider py-4 rounded-2xl hover:opacity-95 shadow-md shadow-sky-500/20 hover:scale-[1.01] active:scale-[0.99] uppercase text-sm mt-2 transition-all"
                 >
                   <Play className="w-5 h-5 fill-current" />
-                  Nộp bài và chấm / Run Judge
+                  Nộp Bài Ngay
                 </button>
               </div>
             </motion.div>
           ) : null}
         </AnimatePresence>
 
-        {/* Right Sidebar: Codeforces Details & Toggle Trigger */}
+        {/* Right Sidebar */}
         {!isEditorOpen && (
-          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-cypher-border bg-cypher-surface/40 p-6 flex flex-col gap-6">
-            {/* Meta details card */}
-            <div className="cyber-panel p-5 rounded-2xl bg-cypher-surface flex flex-col gap-4">
-              <h3 className="text-xs font-black uppercase tracking-widest text-cypher-muted border-b border-cypher-border pb-2">
-                Problem Metadata
+          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-border bg-muted/10 p-6 flex flex-col gap-6">
+            {/* Cypher Voiceline Sidebar Widget */}
+            <CypherVoicelineWidget type="hero" />
+
+            <div className="p-5 rounded-3xl bg-card border border-sky-500/20 flex flex-col gap-4 shadow-sm">
+              <h3 className="text-xs font-extrabold uppercase tracking-widest text-sky-500 border-b border-border pb-2">
+                Thông tin bài tập
               </h3>
-              
-              <div className="flex flex-col gap-3.5 text-sm">
+
+              <div className="flex flex-col gap-3.5 text-xs font-medium">
                 <div className="flex items-center justify-between">
-                  <span className="text-cypher-muted flex items-center gap-1.5">
-                    <Tag className="w-4 h-4 text-cypher-cyan" /> Thể loại:
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Tag className="w-4 h-4 text-sky-500" /> Thể loại:
                   </span>
-                  <span className="font-bold text-foreground">{problem.category || "Basic"}</span>
-                </div>
-                
-                <div className="flex items-center justify-between">
-                  <span className="text-cypher-muted flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-cypher-cyan" /> Phân nhóm:
-                  </span>
-                  <span className="font-bold text-foreground">{problem.group || "Chưa phân loại"}</span>
+                  <span className="font-bold text-foreground">{problem.category || "Căn bản"}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-cypher-muted flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-cypher-cyan" /> Tỉ lệ AC:
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-sky-500" /> Phân nhóm:
                   </span>
-                  <span className="font-bold text-green-500">{problem.acRate || "88%"}</span>
+                  <span className="font-bold text-foreground">{problem.group || "Chung"}</span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-cypher-muted flex items-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-cypher-cyan" /> Lượt AC:
+                  <span className="text-muted-foreground flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-500" /> Tỉ lệ AC:
                   </span>
-                  <span className="font-bold text-foreground font-mono">{problem.acCount || 0}</span>
+                  <span className="font-bold text-emerald-500">{problem.acRate || "88%"}</span>
                 </div>
               </div>
             </div>
 
-            {/* Action Trigger Card */}
-            <div className="cyber-panel p-5 rounded-2xl bg-cypher-surface/80 flex flex-col gap-3">
-              <h3 className="text-xs font-black uppercase tracking-widest text-cypher-muted">
-                Submit Solution
+            <div className="p-5 rounded-3xl bg-card border border-sky-500/20 flex flex-col gap-3 shadow-sm">
+              <h3 className="text-xs font-extrabold uppercase tracking-widest text-sky-500">
+                Nộp Bài Làm
               </h3>
-              <p className="text-xs text-cypher-muted">
-                Compile your code using standard GCC C++17 compiler and stream grading results.
+              <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                Viết mã nguồn C++17 và kiểm tra tiến trình chấm bài từng testcase tự động.
               </p>
 
-              {/* Username Input for Sidebar Submit */}
-              <div className="flex items-center gap-2 border border-cypher-border rounded-xl p-3 bg-background text-sm focus-within:border-cypher-cyan focus-within:ring-2 focus-within:ring-cypher-cyan/20 transition-all">
-                <User className="w-4 h-4 text-cypher-cyan" />
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Username"
-                  className="bg-transparent text-xs outline-none w-full text-foreground font-bold placeholder:text-cypher-muted/50"
-                />
-              </div>
-
-              {/* Submit panel trigger button */}
               <button
                 onClick={() => setIsEditorOpen(true)}
-                className="btn-glow w-full text-center bg-cypher-cyan text-zinc-950 font-black py-3 rounded-xl hover:bg-cypher-cyan/95 transition-all text-xs uppercase tracking-wider mt-1 hover:scale-[1.02] active:scale-[0.98] border-2 border-transparent hover:border-cypher-cyan/30"
+                className="w-full text-center bg-gradient-to-r from-sky-500 via-cyan-500 to-indigo-600 text-white font-extrabold py-3.5 rounded-2xl hover:opacity-95 shadow-md shadow-sky-500/20 transition-all text-xs uppercase tracking-wider mt-1 hover:scale-[1.02] active:scale-[0.98]"
               >
-                Mở khung nộp bài
+                Mở khung nộp bài C++
               </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Mobile/Tablet Fallback Editor panel shown at bottom if toggled open */}
-      <AnimatePresence>
-        {isEditorOpen ? (
-          <div className="lg:hidden fixed inset-0 z-50 bg-background/95 flex flex-col p-4 gap-4 overflow-y-auto">
-            <div className="flex justify-between items-center border-b border-cypher-border pb-3">
-              <h3 className="text-sm font-black uppercase tracking-wider text-cypher-cyan flex items-center gap-2">
-                <Terminal className="w-4 h-4" />
-                Mobile Editor Console
-              </h3>
-              <button 
-                onClick={() => setIsEditorOpen(false)}
-                className="px-3 py-1.5 rounded-lg border border-cypher-border hover:border-red-500 hover:text-red-500 text-xs font-bold bg-cypher-surface transition-all"
-              >
-                Đóng ✕
-              </button>
-            </div>
-
-            <div className="flex items-center gap-2 border border-cypher-border rounded-xl p-3 bg-cypher-surface focus-within:border-cypher-cyan focus-within:ring-2 focus-within:ring-cypher-cyan/20 transition-all">
-              <User className="w-4 h-4 text-cypher-cyan" />
-              <input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Agent Username"
-                className="bg-transparent text-sm outline-none w-full text-foreground font-bold placeholder:text-cypher-muted/50"
-              />
-            </div>
-
-            <div className="flex-1 min-h-[300px]">
-              <CodeEditor
-                value={code}
-                onChange={setCode}
-                defaultCode={DEFAULT_CPP_TEMPLATE}
-              />
-            </div>
-
-            <button
-              onClick={handleSubmit}
-              className="btn-glow w-full text-center bg-cypher-cyan text-zinc-950 font-black py-4 rounded-xl hover:bg-cypher-cyan/90 transition-all text-sm uppercase tracking-wider hover:scale-[1.02] active:scale-[0.98] border-2 border-transparent hover:border-cypher-cyan/30"
-            >
-              Nộp bài và chấm
-            </button>
-          </div>
-        ) : null}
-      </AnimatePresence>
+      {/* Cypher Animated Submit Modal */}
+      <CypherSubmitAnimationModal
+        isOpen={isSubmitModalOpen}
+        onClose={handleFinishSubmit}
+        status={submitStatus}
+        passedCount={passedCount}
+        totalCount={totalCount}
+        verdictText={verdictText}
+        verdictScore={verdictScore}
+        codeSnippet={code}
+      />
     </div>
   );
 }

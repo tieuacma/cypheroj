@@ -19,15 +19,24 @@ function toDbProblem(doc: ProblemLean): DbProblem {
     input_format: doc.input_format ?? "",
     output_format: doc.output_format ?? "",
     category: doc.category,
+    group: doc.group,
     sample_input: doc.sample_input,
     sample_output: doc.sample_output,
     time_limit_ms: doc.time_limit_ms,
     memory_limit_mb: doc.memory_limit_mb,
+    elo_rating: doc.elo_rating ?? 1000,
     is_subtask: doc.is_subtask,
     subtasks: doc.subtasks || [],
     created_at: doc.created_at,
     updated_at: doc.updated_at,
   };
+}
+
+async function ensureProblemEloRatings(): Promise<void> {
+  await ProblemModel.updateMany(
+    { elo_rating: { $exists: false } },
+    { $set: { elo_rating: 1000 } }
+  );
 }
 
 function assertValidProblemId(id: string): void {
@@ -45,6 +54,7 @@ function normalizeCreateInput(input: CreateProblemInput): CreateProblemInput {
     id: input.id.trim().toLowerCase(),
     title: input.title.trim(),
     category: input.category.trim(),
+    group: input.group?.trim() || "",
   };
 }
 
@@ -93,6 +103,7 @@ export async function createProblem(input: CreateProblemInput): Promise<DbProble
 export async function getProblemById(id: string): Promise<DbProblem | null> {
   try {
     await connectMongoDB();
+    await ensureProblemEloRatings();
     const doc = await ProblemModel.findOne({ id }).lean<ProblemLean>();
     return doc ? toDbProblem(doc) : null;
   } catch (error) {
@@ -107,6 +118,7 @@ export async function getProblemById(id: string): Promise<DbProblem | null> {
 export async function listProblems(): Promise<DbProblem[]> {
   try {
     await connectMongoDB();
+    await ensureProblemEloRatings();
     const docs = await ProblemModel.find().sort({ created_at: -1 }).lean<ProblemLean[]>();
     return docs.map(toDbProblem);
   } catch (error) {
@@ -150,6 +162,9 @@ export async function updateProblem(
     if (payload.title !== undefined) updatePayload.title = payload.title.trim();
     if (payload.category !== undefined) {
       updatePayload.category = payload.category.trim();
+    }
+    if (payload.group !== undefined) {
+      updatePayload.group = payload.group.trim();
     }
 
     const updated = await ProblemModel.findOneAndUpdate(

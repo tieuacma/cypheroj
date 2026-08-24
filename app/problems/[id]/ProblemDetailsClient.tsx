@@ -18,7 +18,7 @@ import {
   Check,
   Maximize2,
   Minimize2,
-  Sparkles,
+  Gauge,
 } from "lucide-react";
 import { CodeEditor } from "@/components/CodeEditor";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
@@ -26,7 +26,8 @@ import { CodeBlock } from "@/components/ui/CodeBlock";
 import { DEFAULT_CPP_TEMPLATE } from "@/lib/types";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { SerializedProblem } from "@/lib/actions/problems";
-import { getProblemTotalPoints } from "@/lib/db/types";
+import type { DbSubmission } from "@/lib/db/types";
+import { CypherSubmitAnimationModal } from "@/components/CypherSubmitAnimationModal";
 
 interface ProblemDetailsClientProps {
   problem: SerializedProblem;
@@ -42,13 +43,27 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  // Cypher Submit Modal State
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState<"compiling" | "evaluating" | "completed" | "error">("compiling");
+  const [passedCount, setPassedCount] = useState(0);
+  const [totalCount, setTotalCount] = useState(20);
+  const [verdictText, setVerdictText] = useState("ACCEPTED");
+  const [verdictScore, setVerdictScore] = useState(100);
+  const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
 
-  const totalPoints = getProblemTotalPoints(problem);
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting) return;
     setError(null);
     setIsSubmitting(true);
+
+    // Trigger Cypher Animation Modal Flow
+    setIsSubmitModalOpen(true);
+    setSubmitStatus("compiling");
+    setPassedCount(0);
+    setVerdictText("EVALUATING");
+    setVerdictScore(0);
 
     try {
       const response = await fetch("/api/submit", {
@@ -81,13 +96,76 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
         throw new Error("API did not return a submission_id.");
       }
 
-      router.push(`/submission/${submissionId}`);
+      setPendingSubmissionId(submissionId);
+
+      // Start evaluating stage & poll for real judging results
+      setTimeout(() => {
+        setSubmitStatus("evaluating");
+      }, 500);
+
+      let attempts = 0;
+      const maxAttempts = 16; // Poll up to ~8 seconds
+
+      const pollInterval = setInterval(async () => {
+        attempts++;
+        try {
+          const subRes = await fetch(`/api/submissions/${submissionId}`);
+          if (subRes.ok) {
+            const subData: DbSubmission = await subRes.json();
+            const totalPts = subData.total_points || 100;
+            const earnedPts = subData.earned_points ?? 0;
+            setVerdictScore(earnedPts);
+
+            if (subData.details && subData.details.length > 0) {
+              setTotalCount(subData.details.length);
+              const acs = subData.details.filter((d) => d.status === "ac").length;
+              setPassedCount(acs);
+            } else {
+              setPassedCount(Math.min(totalCount, Math.floor((attempts / maxAttempts) * totalCount)));
+            }
+
+            if (subData.status === "completed" || subData.status === "internal_error" || attempts >= maxAttempts) {
+              clearInterval(pollInterval);
+              let vText = "ACCEPTED";
+              if (subData.status === "internal_error") {
+                vText = "RUNTIME ERROR";
+              } else if (subData.error_log && subData.error_log.trim().length > 0) {
+                vText = subData.error_log.toLowerCase().includes("compile") ? "COMPILATION ERROR" : "RUNTIME ERROR";
+              } else if (earnedPts === totalPts && totalPts > 0) {
+                vText = "ACCEPTED";
+              } else if (earnedPts > 0) {
+                vText = `PARTIAL (${earnedPts}/${totalPts}đ)`;
+              } else {
+                vText = "WRONG ANSWER";
+              }
+              setVerdictText(vText);
+              setSubmitStatus("completed");
+            }
+          }
+        } catch (pollErr) {
+          console.error("Poll submission error:", pollErr);
+          if (attempts >= maxAttempts) {
+            clearInterval(pollInterval);
+            setSubmitStatus("completed");
+          }
+        }
+      }, 500);
+
     } catch (err: unknown) {
       console.error(err);
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra khi nộp bài.");
+      setSubmitStatus("error");
       setIsSubmitting(false);
     }
-  }, [code, isSubmitting, problem.id, router, username]);
+  }, [code, isSubmitting, problem.id, totalCount, username]);
+
+  const handleFinishSubmit = () => {
+    setIsSubmitModalOpen(false);
+    setIsSubmitting(false);
+    if (pendingSubmissionId) {
+      router.push(`/submission/${pendingSubmissionId}`);
+    }
+  };
 
   // Global keyboard shortcut: Ctrl+Enter (or Cmd+Enter) to submit
   useEffect(() => {
@@ -198,8 +276,8 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
                   Bộ nhớ: <strong className="text-foreground font-mono font-bold">{problem.memory_limit_mb} MB</strong>
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-cypher-cyan" />
-                  Thang điểm: <strong className="text-cypher-cyan font-mono font-bold">{totalPoints}đ</strong>
+                  <Gauge className="w-4 h-4 text-amber-500" />
+                  Elo: <strong className="text-amber-500 font-mono font-bold">{problem.elo_rating ?? 1000}</strong>
                 </span>
               </div>
             </div>
@@ -366,8 +444,10 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-cypher-muted text-xs">Thang điểm</span>
-                  <span className="font-bold text-cypher-cyan font-mono text-sm">{totalPoints}đ</span>
+                  <span className="text-cypher-muted flex items-center gap-1.5 text-xs">
+                    <Gauge className="w-3.5 h-3.5 text-amber-500" /> Hệ số Elo
+                  </span>
+                  <span className="font-bold text-amber-500 font-mono text-sm">{problem.elo_rating ?? 1000}</span>
                 </div>
 
                 {problem.is_subtask && problem.subtasks && problem.subtasks.length > 0 && (
@@ -375,7 +455,7 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
                     <span className="text-[11px] font-bold text-cypher-muted uppercase font-mono">Cấu hình Subtasks:</span>
                     <div className="flex flex-col gap-1.5">
                       {problem.subtasks.map((sub, idx) => (
-                        <div key={idx} className="flex justify-between items-center text-xs bg-zinc-950/40 p-2 rounded-lg border border-cypher-border/20">
+                        <div key={idx} className="flex justify-between items-center text-xs bg-muted/50 dark:bg-zinc-950/40 p-2 rounded-lg border border-cypher-border/20">
                           <span className="text-cypher-muted truncate max-w-[150px]">{sub.label}</span>
                           <span className="font-bold text-cypher-cyan font-mono">{sub.points}đ</span>
                         </div>
@@ -461,6 +541,18 @@ export function ProblemDetailsClient({ problem }: ProblemDetailsClientProps) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Cypher Animated Submit Modal */}
+      <CypherSubmitAnimationModal
+        isOpen={isSubmitModalOpen}
+        onClose={handleFinishSubmit}
+        status={submitStatus}
+        passedCount={passedCount}
+        totalCount={totalCount}
+        verdictText={verdictText}
+        verdictScore={verdictScore}
+        codeSnippet={code}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import { useTheme } from "@/lib/theme-provider";
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
   loading: () => (
-    <div className="flex h-full min-h-[360px] items-center justify-center text-sm text-zinc-500">
+    <div className="flex h-full min-h-[360px] items-center justify-center text-sm text-muted-foreground">
       Loading editor...
     </div>
   ),
@@ -27,11 +27,12 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({ value, onChange, defaultCode, readOnly = false }: CodeEditorProps) {
-  const { theme, mounted } = useTheme();
+  const { theme, resolvedTheme, mounted } = useTheme();
   const [fontSize, setFontSize] = useState<number>(14);
   const [isActive, setIsActive] = useState(false);
 
-  const monacoTheme = mounted && theme === "dark" ? "vs-dark" : "light";
+  const activeTheme = resolvedTheme || (theme === "dark" ? "dark" : "light");
+  const monacoTheme = mounted && activeTheme === "dark" ? "vs-dark" : "light";
 
   const handleMount: OnMount = useCallback((editor) => {
     editor.onDidFocusEditorText(() => !readOnly && setIsActive(true));
@@ -52,10 +53,10 @@ export function CodeEditor({ value, onChange, defaultCode, readOnly = false }: C
           <select
             value={fontSize}
             onChange={(e) => setFontSize(Number(e.target.value))}
-            className="rounded-lg border border-cypher-border bg-transparent px-3 py-1.5 text-xs text-foreground outline-none focus:border-cypher-cyan focus:ring-2 focus:ring-cypher-cyan/20 transition-all cursor-pointer"
+            className="rounded-lg border border-cypher-border bg-card px-3 py-1.5 text-xs text-foreground outline-none focus:border-cypher-cyan focus:ring-2 focus:ring-cypher-cyan/20 transition-all cursor-pointer"
           >
             {FONT_SIZES.map((size) => (
-              <option key={size} value={size}>
+              <option key={size} value={size} className="bg-card text-foreground">
                 {size}px
               </option>
             ))}

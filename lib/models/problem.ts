@@ -22,10 +22,12 @@ const ProblemSchema = new Schema(
     input_format: { type: String, required: true, default: "" },
     output_format: { type: String, required: true, default: "" },
     category: { type: String, required: true, trim: true, default: "General" },
+    group: { type: String, required: false, trim: true, default: "" },
     sample_input: { type: String, required: true, default: "" },
     sample_output: { type: String, required: true, default: "" },
     time_limit_ms: { type: Number, required: true, min: 1, default: 1000 },
     memory_limit_mb: { type: Number, required: true, min: 1, default: 256 },
+    elo_rating: { type: Number, required: true, min: 100, max: 3000, default: 1000 },
     is_subtask: { type: Boolean, required: true, default: false },
     subtasks: {
       type: [

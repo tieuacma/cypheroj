@@ -19,10 +19,11 @@ import {
   Italic,
   Eye,
   FileText,
+  Gauge,
 } from "lucide-react";
-import { createProblemAction } from "@/lib/actions/problems";
 import { MarkdownRenderer } from "@/components/MarkdownRenderer";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { AdminKeyModal } from "@/components/AdminKeyModal";
 import type { SubtaskConfig, ProblemInput } from "@/lib/db/types";
 
 export default function CreateProblemPage() {
@@ -34,6 +35,7 @@ export default function CreateProblemPage() {
   const [group, setGroup] = useState("");
   const [timeLimitMs, setTimeLimitMs] = useState(1000);
   const [memoryLimitMb, setMemoryLimitMb] = useState(256);
+  const [eloRating, setEloRating] = useState(1000);
   const [content, setContent] = useState("");
   const [inputFormat, setInputFormat] = useState("");
   const [outputFormat, setOutputFormat] = useState("");
@@ -45,6 +47,7 @@ export default function CreateProblemPage() {
   const [activeTab, setActiveTab] = useState<"edit" | "preview">("edit");
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   const PROBLEM_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -78,7 +81,7 @@ export default function CreateProblemPage() {
     ? subtasks.reduce((sum, s) => sum + s.points, 0)
     : 100;
 
-  const handleSave = async () => {
+  const handleSave = async (adminKey: string) => {
     setError(null);
 
     const normalizedId = id.trim().toLowerCase();
@@ -109,17 +112,24 @@ export default function CreateProblemPage() {
         input_format: inputFormat.trim(),
         output_format: outputFormat.trim(),
         category: category.trim(),
+        group: group.trim(),
         sample_input: sampleInput,
         sample_output: sampleOutput,
         time_limit_ms: timeLimitMs,
         memory_limit_mb: memoryLimitMb,
+        elo_rating: eloRating,
         is_subtask: isSubtask,
         subtasks: isSubtask ? subtasks : [],
       };
 
-      const result = await createProblemAction(payload);
-      if (!result) {
-        throw new Error("Lỗi không xác định khi lưu bài tập.");
+      const response = await fetch("/api/problems", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, adminKey }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || "Không thể tạo bài tập mới.");
       }
 
       router.push(`/problems/${result.id}`);
@@ -133,6 +143,10 @@ export default function CreateProblemPage() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleSaveClick = () => {
+    if (!isSaving) setIsAdminModalOpen(true);
   };
 
   return (
@@ -177,7 +191,7 @@ export default function CreateProblemPage() {
             </div>
 
             <button
-              onClick={handleSave}
+              onClick={handleSaveClick}
               disabled={isSaving}
               className="soft-btn-primary disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(14,165,233,0.3)]"
             >
@@ -284,6 +298,23 @@ export default function CreateProblemPage() {
                   />
                 </div>
               </div>
+
+              <div className="flex flex-col gap-1.5 md:w-1/2">
+                <label className="soft-label flex items-center gap-1.5">
+                  <Gauge className="w-3.5 h-3.5 text-cypher-cyan" /> Hệ số Elo
+                </label>
+                <input
+                  type="number"
+                  value={eloRating}
+                  onChange={(e) => setEloRating(Number(e.target.value))}
+                  min={100}
+                  max={3000}
+                  step={50}
+                  className="soft-input font-mono font-bold"
+                />
+                <span className="text-[11px] text-cypher-muted">Mức độ khó đề xuất, từ 100 đến 3000.</span>
+              </div>
+
             </div>
 
             {/* Markdown + LaTeX Fields with Quick Toolbar */}
@@ -570,13 +601,13 @@ export default function CreateProblemPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex flex-col gap-2">
                 <span className="soft-label">Sample Input</span>
-                <pre className="bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
+                <pre className="bg-zinc-100 dark:bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-800 dark:text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
                   {sampleInput || "[Trống]"}
                 </pre>
               </div>
               <div className="flex flex-col gap-2">
                 <span className="soft-label">Sample Output</span>
-                <pre className="bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
+                <pre className="bg-zinc-100 dark:bg-zinc-950/90 p-4 rounded-xl border border-cypher-border font-mono text-xs text-zinc-800 dark:text-zinc-200 max-h-[200px] overflow-y-auto leading-relaxed">
                   {sampleOutput || "[Trống]"}
                 </pre>
               </div>
@@ -584,6 +615,17 @@ export default function CreateProblemPage() {
           </div>
         </div>
       </div>
+
+      <AdminKeyModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        onSuccess={(adminKey) => {
+          setIsAdminModalOpen(false);
+          void handleSave(adminKey);
+        }}
+        title="Xác thực quyền tạo bài tập"
+        description="Nhập Admin Key để tạo bài tập mới. Key chỉ được gửi đến máy chủ để xác thực và không hiển thị trên giao diện."
+      />
     </div>
   );
 }

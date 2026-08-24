@@ -11,10 +11,12 @@ export interface DbProblem {
   input_format: string;
   output_format: string;
   category: string;
+  group?: string;
   sample_input: string;
   sample_output: string;
   time_limit_ms: number;
   memory_limit_mb: number;
+  elo_rating: number;
   is_subtask: boolean;
   subtasks: SubtaskConfig[];
   created_at?: Date;

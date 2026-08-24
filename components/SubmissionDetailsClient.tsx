@@ -22,6 +22,8 @@ import type { TestcaseDetail, TestcaseVerdict } from "@/lib/types";
 import type { DbSubmission } from "@/lib/db/types";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CodeEditor } from "@/components/CodeEditor";
+import { Navbar } from "@/components/Navbar";
+import { CypherVoicelineWidget } from "@/components/CypherVoicelineWidget";
 
 interface SubmissionDetailsClientProps {
   id: string; // Numeric ID from Supabase
@@ -367,29 +369,21 @@ export function SubmissionDetailsClient({ id }: SubmissionDetailsClientProps) {
     return true;
   });
 
+  const getVoicelineType = () => {
+    if (verdict === "Accepted") return "accepted";
+    if (verdict === "Wrong Answer") return "wrongAnswer";
+    if (verdict === "Time Limit Exceeded") return "timeLimit";
+    if (verdict === "Compilation Error") return "compilationError";
+    return "compiling";
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col selection:bg-cypher-cyan/30">
-      {/* Header */}
-      <header className="border-b border-cypher-border bg-cypher-surface/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href={`/problems/${submission.problem_id}`}
-              className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-cypher-muted hover:text-cypher-cyan transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" /> Quay lại đề bài
-            </Link>
-          </div>
+    <div className="min-h-screen bg-background flex flex-col text-foreground selection:bg-sky-500/20">
+      <Navbar />
 
-          <span className="text-lg font-black tracking-widest text-shimmer">
-            CYPHER<span className="text-cypher-cyan">.REPORT</span>
-          </span>
-
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 w-full">
+        <CypherVoicelineWidget type={getVoicelineType()} />
+      </div>
 
       {/* Main Container */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-8 flex flex-col gap-6">
@@ -480,7 +474,7 @@ export function SubmissionDetailsClient({ id }: SubmissionDetailsClientProps) {
               <span>Compiler console / Nhật ký hệ thống</span>
               <Zap className="w-3.5 h-3.5" />
             </h4>
-            <div className="flex-grow bg-zinc-950/90 rounded-xl border border-cypher-border p-4 font-mono text-xs text-zinc-300 overflow-y-auto max-h-[140px] min-h-[100px] leading-relaxed">
+            <div className="flex-grow bg-zinc-100 dark:bg-zinc-950/90 rounded-xl border border-cypher-border p-4 font-mono text-xs text-zinc-800 dark:text-zinc-300 overflow-y-auto max-h-[140px] min-h-[100px] leading-relaxed">
               {verdict === "Pending" && (
                 <div className="flex items-center gap-2 text-cypher-cyan animate-pulse">
                   <Loader2 className="w-4 h-4 animate-spin" />

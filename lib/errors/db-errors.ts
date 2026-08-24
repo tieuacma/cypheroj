@@ -4,7 +4,10 @@ export type DbErrorCode =
   | "PROBLEM_ID_INVALID"
   | "SUBMISSION_NOT_FOUND"
   | "VALIDATION_ERROR"
-  | "DATABASE_ERROR";
+  | "DATABASE_ERROR"
+  | "AUTH_FAILED"
+  | "DUPLICATE_ERROR"
+  | "NOT_FOUND";
 
 export class DbError extends Error {
   readonly code: DbErrorCode;
